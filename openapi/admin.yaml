@@ -1,0 +1,2525 @@
+openapi: 3.0.3
+info:
+  title: LLM Gateway - Admin API
+  version: 1.1.0
+servers:
+  - url: /admin
+security:
+  - cookieAuth: []
+tags:
+  - name: Dashboard
+  - name: Models
+  - name: Routing
+  - name: ApiKeys
+  - name: Users
+  - name: Apps
+  - name: Roles
+  - name: Permissions
+  - name: Quotas
+  - name: Reports
+  - name: Logs
+  - name: Jobs
+  - name: Audit
+  - name: Settings
+  - name: Security
+
+paths:
+  # -------------------------
+  # Dashboard
+  # -------------------------
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard summary metrics
+      parameters:
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+      responses:
+        '200':
+          description: Summary cards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+              examples:
+                example:
+                  value:
+                    from: "2026-02-12T00:00:00Z"
+                    to: "2026-02-13T00:00:00Z"
+                    requests: 12345
+                    success_rate: 0.992
+                    p95_latency_ms: 1800
+                    total_tokens: 9876543
+                    total_cost_cny: 1234.56
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Models
+  # -------------------------
+  /models:
+    get:
+      tags: [Models]
+      summary: List models
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: q
+          in: query
+          schema: { type: string }
+          description: search by name/vendor/vendor_model_id
+        - name: vendor
+          in: query
+          schema: { type: string }
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - name: enabled
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paged model list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedModel' }
+              examples:
+                example:
+                  value:
+                    page: 1
+                    page_size: 20
+                    total: 2
+                    items:
+                      - id: 12
+                        name: "gpt-4o-mini"
+                        vendor: "openai"
+                        model_type: "CHAT"
+                        vendor_model_id: "gpt-4o-mini"
+                        enabled: true
+                        currency: "CNY"
+                        input_price: 0.10
+                        output_price: 0.30
+                        timeout_ms: 60000
+                        updated_at: "2026-02-13T00:00:00Z"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Models]
+      summary: Create model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModelCreateRequest' }
+            examples:
+              example:
+                value:
+                  name: "gpt-4o-mini"
+                  vendor: "openai"
+                  model_type: "CHAT"
+                  vendor_model_id: "gpt-4o-mini"
+                  enabled: true
+                  currency: "CNY"
+                  input_price: 0.10
+                  output_price: 0.30
+                  timeout_ms: 60000
+      responses:
+        '201':
+          description: Created model
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Model' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /models/{id}:
+    get:
+      tags: [Models]
+      summary: Get model by id
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: Model detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Model' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Models]
+      summary: Update model
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModelUpdateRequest' }
+      responses:
+        '200':
+          description: Updated model
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Model' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Models]
+      summary: Enable/Disable model
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200':
+          description: Patched model
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Model' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /models/{id}/credential:
+    put:
+      tags: [Models]
+      summary: Set/Update model credential (encrypted at rest)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModelCredentialUpsertRequest' }
+            examples:
+              openai_api_key:
+                value:
+                  credential_type: "API_KEY"
+                  payload:
+                    api_key: "sk-xxxx"
+              aksk:
+                value:
+                  credential_type: "AKSK"
+                  payload:
+                    access_key: "xxx"
+                    secret_key: "yyy"
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [Models]
+      summary: Get credential status/fingerprint (never return plaintext)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: Credential status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  credential_type: { type: string }
+                  fingerprint: { type: string, description: "e.g., last4 or hash prefix" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------
+  # Routing Policies
+  # -------------------------
+  /routing/policies:
+    get:
+      tags: [Routing]
+      summary: List routing policies
+      parameters:
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - name: policy_type
+          in: query
+          schema: { $ref: '#/components/schemas/PolicyType' }
+      responses:
+        '200':
+          description: Policy list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoutingPolicy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /routing/policies/upsert:
+    post:
+      tags: [Routing]
+      summary: Upsert a department routing policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutingPolicyUpsertRequest' }
+            examples:
+              example:
+                value:
+                  dept_id: 1
+                  model_type: "CHAT"
+                  policy_type: "COST_FIRST"
+                  enabled: true
+                  model_chain: [12, 7, 3]
+      responses:
+        '200':
+          description: Upserted policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingPolicy' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /routing/policies/validate:
+    post:
+      tags: [Routing]
+      summary: Validate routing policy chain (type/enabled/permission conflicts)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutingPolicyUpsertRequest' }
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  warnings:
+                    type: array
+                    items: { $ref: '#/components/schemas/ValidationIssue' }
+                  errors:
+                    type: array
+                    items: { $ref: '#/components/schemas/ValidationIssue' }
+              examples:
+                example:
+                  value:
+                    ok: false
+                    warnings:
+                      - code: "MODEL_DISABLED"
+                        message: "Model 7 is disabled"
+                        field: "model_chain"
+                    errors:
+                      - code: "MODEL_TYPE_MISMATCH"
+                        message: "Model 21 is OCR but policy model_type is CHAT"
+                        field: "model_chain"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # API Keys
+  # -------------------------
+  /api-keys:
+    get:
+      tags: [ApiKeys]
+      summary: List API keys
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: owner_type
+          in: query
+          schema: { $ref: '#/components/schemas/OwnerType' }
+        - name: owner_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, EXPIRED, REVOKED]
+        - name: q
+          in: query
+          schema: { type: string }
+          description: search by name
+      responses:
+        '200':
+          description: Paged key list (never returns plaintext key)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedApiKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [ApiKeys]
+      summary: Create API key (plaintext returned once)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiKeyCreateRequest' }
+            examples:
+              app_key:
+                value:
+                  name: "crm-prod"
+                  owner_type: "APP"
+                  owner_id: 10
+                  dept_id: 1
+                  expires_at: "2026-12-31T00:00:00Z"
+                  scoped_model_ids: [12, 7]
+      responses:
+        '201':
+          description: Created key (plaintext only in this response)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiKeyCreateResponse' }
+              examples:
+                example:
+                  value:
+                    id: 100
+                    name: "crm-prod"
+                    owner_type: "APP"
+                    owner_id: 10
+                    dept_id: 1
+                    expires_at: "2026-12-31T00:00:00Z"
+                    api_key_plaintext: "gw_live_xxxxx"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api-keys/{id}:
+    get:
+      tags: [ApiKeys]
+      summary: Get API key metadata
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: Key metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [ApiKeys]
+      summary: Update API key (expiry, scope)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiKeyPatchRequest' }
+      responses:
+        '200':
+          description: Updated key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiKey' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api-keys/{id}/revoke:
+    post:
+      tags: [ApiKeys]
+      summary: Revoke API key
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '204':
+          description: Revoked
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------
+  # Users / Apps
+  # -------------------------
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: active
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          schema: { type: string }
+          description: search by username/display_name/email
+      responses:
+        '200':
+          description: Paged users
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      summary: Update user status or department
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserPatchRequest' }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps:
+    get:
+      tags: [Apps]
+      summary: List apps
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: active
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          schema: { type: string }
+          description: search by name
+      responses:
+        '200':
+          description: Paged apps
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedApp' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Apps]
+      summary: Create app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppCreateRequest' }
+      responses:
+        '201':
+          description: Created app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /apps/{id}:
+    get:
+      tags: [Apps]
+      summary: Get app
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: App
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Apps]
+      summary: Update app status/owner/department
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppPatchRequest' }
+      responses:
+        '200':
+          description: Updated app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------
+  # Roles / Permissions / Role-Models
+  # -------------------------
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      responses:
+        '200':
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles]
+      summary: Create role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleCreateRequest' }
+      responses:
+        '201':
+          description: Created role
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /roles/{id}:
+    get:
+      tags: [Roles]
+      summary: Get role
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Roles]
+      summary: Update role (name/default)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RolePatchRequest' }
+      responses:
+        '200':
+          description: Updated role
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /roles/{id}/permissions:
+    put:
+      tags: [Roles]
+      summary: Set role permissions (replace)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permission_codes]
+              properties:
+                permission_codes:
+                  type: array
+                  items: { type: string }
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /permissions:
+    get:
+      tags: [Permissions]
+      summary: List permissions
+      responses:
+        '200':
+          description: Permission list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /roles/{id}/models:
+    put:
+      tags: [Roles]
+      summary: Set role model permissions (replace)
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model_ids]
+              properties:
+                model_ids:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /subjects/{subject_type}/{subject_id}/roles:
+    put:
+      tags: [Roles]
+      summary: Set subject roles (replace)
+      parameters:
+        - name: subject_type
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/OwnerType' }
+        - name: subject_id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_ids]
+              properties:
+                role_ids:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Security Governance
+  # -------------------------
+  /security/sensitive-words:
+    get:
+      tags: [Security]
+      summary: List sensitive words/rules
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH]
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [WARN, BLOCK]
+        - name: scope_type
+          in: query
+          schema:
+            type: string
+            enum: [GLOBAL, DEPT, USER]
+        - name: active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paged sensitive words
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedSensitiveWord' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Security]
+      summary: Create sensitive word/rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SensitiveWordUpsertRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SensitiveWord' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /security/sensitive-words/{id}:
+    patch:
+      tags: [Security]
+      summary: Update sensitive word/rule
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SensitiveWordUpsertRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SensitiveWord' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Security]
+      summary: Disable sensitive word/rule
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '204': { description: Disabled }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /security/access-lists:
+    get:
+      tags: [Security]
+      summary: List allow/block list entries (user/dept/app/ip)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - name: list_type
+          in: query
+          schema:
+            type: string
+            enum: [ALLOW, BLOCK]
+        - name: subject_type
+          in: query
+          schema:
+            type: string
+            enum: [USER, DEPT, APP, IP]
+        - name: active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paged access list entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedAccessListEntry' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Security]
+      summary: Create allow/block list entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccessListEntryUpsertRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessListEntry' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /security/access-lists/{id}:
+    patch:
+      tags: [Security]
+      summary: Update allow/block list entry
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccessListEntryUpsertRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessListEntry' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Security]
+      summary: Disable allow/block list entry
+      parameters:
+        - $ref: '#/components/parameters/idPath'
+      responses:
+        '204': { description: Disabled }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /security/prompt-injection/policy:
+    get:
+      tags: [Security]
+      summary: Get prompt-injection and content safety policy
+      responses:
+        '200':
+          description: Policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromptInjectionPolicy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Security]
+      summary: Update prompt-injection and content safety policy (audited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromptInjectionPolicyUpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromptInjectionPolicy' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /security/incidents:
+    get:
+      tags: [Security]
+      summary: List security incidents (sensitive words, prompt injection, access list hits)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - name: rule_type
+          in: query
+          schema:
+            type: string
+            enum: [SENSITIVE_WORD, PROMPT_INJECTION, ACCESS_LIST]
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [ALLOW, WARN, BLOCK]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH]
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: user_id
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Paged security incidents
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedSecurityIncident' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Quotas
+  # -------------------------
+  /quotas:
+    get:
+      tags: [Quotas]
+      summary: List quotas (user or dept)
+      parameters:
+        - name: scope_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [USER, DEPT]
+        - name: scope_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: month_yyyymm
+          in: query
+          schema: { type: string, pattern: '^\d{6}$' }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Paged quotas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedQuota' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /quotas/upsert:
+    post:
+      tags: [Quotas]
+      summary: Upsert quota (set monthly token cap)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotaUpsertRequest' }
+      responses:
+        '200':
+          description: Upserted quota
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quota' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Reports (Usage & Cost)
+  # -------------------------
+  /reports/usage:
+    get:
+      tags: [Reports]
+      summary: Usage report (tokens/calls/latency) aggregated
+      parameters:
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [WEEK, MONTH, QUARTER]
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [USER_MODEL, DEPT_MODEL, USER, DEPT, MODEL, VENDOR]
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: user_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: model_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: vendor
+          in: query
+          schema: { type: string }
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 1000 }
+      responses:
+        '200':
+          description: Usage aggregation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+                  period: { type: string }
+                  group_by: { type: string }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/UsageAggRow' }
+              examples:
+                by_user_model:
+                  value:
+                    from: "2026-02-01T00:00:00Z"
+                    to: "2026-03-31T23:59:59Z"
+                    period: "MONTH"
+                    group_by: "USER_MODEL"
+                    items:
+                      - key: "u:101|m:12"
+                        period_start: "2026-02-01"
+                        period_end: "2026-02-28"
+                        user_id: 101
+                        model_id: 12
+                        requests: 1200
+                        success_rate: 0.995
+                        input_tokens: 1000000
+                        output_tokens: 500000
+                        total_tokens: 1500000
+                        p95_latency_ms: 2100
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/cost:
+    get:
+      tags: [Reports]
+      summary: Cost report (CNY) aggregated
+      parameters:
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [WEEK, MONTH, QUARTER]
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [USER_MODEL, DEPT_MODEL, USER, DEPT, MODEL, VENDOR]
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: user_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: model_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: vendor
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 1000 }
+      responses:
+        '200':
+          description: Cost aggregation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+                  period: { type: string }
+                  group_by: { type: string }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/CostAggRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/security:
+    get:
+      tags: [Reports]
+      summary: Security governance report (weekly/monthly/quarterly)
+      parameters:
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [WEEK, MONTH, QUARTER]
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [RULE_TYPE, ACTION, MODEL_TYPE, DEPT, USER]
+        - name: rule_type
+          in: query
+          schema:
+            type: string
+            enum: [SENSITIVE_WORD, PROMPT_INJECTION, ACCESS_LIST]
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [ALLOW, WARN, BLOCK]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH]
+      responses:
+        '200':
+          description: Security report rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+                  period: { type: string }
+                  group_by: { type: string }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SecurityAggRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Logs (ES-backed)
+  # -------------------------
+  /logs/requests:
+    get:
+      tags: [Logs]
+      summary: Search request logs (ES)
+      parameters:
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: request_id
+          in: query
+          schema: { type: string }
+        - name: job_id
+          in: query
+          schema: { type: string }
+        - name: base_path
+          in: query
+          schema:
+            type: string
+            enum: [OPENAI, CLAUDE]
+        - name: endpoint
+          in: query
+          schema: { type: string }
+        - name: vendor
+          in: query
+          schema: { type: string }
+        - name: model_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: model_type
+          in: query
+          schema: { $ref: '#/components/schemas/ModelType' }
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: subject_type
+          in: query
+          schema: { $ref: '#/components/schemas/OwnerType' }
+        - name: subject_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [SUCCESS, FAILED]
+      responses:
+        '200':
+          description: Paged ES hits (metadata only; raw fields may be absent)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedLogHit' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /logs/requests/{request_id}:
+    get:
+      tags: [Logs]
+      summary: Get request log detail by request_id
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Log detail (raw fields included only if enabled and permitted)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------
+  # Jobs (MySQL-backed)
+  # -------------------------
+  /jobs:
+    get:
+      tags: [Jobs]
+      summary: List async jobs
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELED]
+        - name: job_type
+          in: query
+          schema:
+            type: string
+            enum: [CHAT, EMBEDDING, RERANK, VL, OCR, EMBEDDING_BATCH]
+        - name: dept_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: owner_type
+          in: query
+          schema: { $ref: '#/components/schemas/OwnerType' }
+        - name: owner_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: job_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paged jobs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedJob' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      summary: Get job detail
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /jobs/{job_id}/retry:
+    post:
+      tags: [Jobs]
+      summary: Retry a job (re-enqueue)
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Retried
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /jobs/{job_id}/cancel:
+    post:
+      tags: [Jobs]
+      summary: Cancel a job (best-effort)
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Canceled
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------
+  # Audit
+  # -------------------------
+  /audit/logs:
+    get:
+      tags: [Audit]
+      summary: List admin audit logs
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/timeFrom'
+        - $ref: '#/components/parameters/timeTo'
+        - name: actor_user_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: resource_type
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paged audit logs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedAuditLog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Settings
+  # -------------------------
+  /settings/logging:
+    get:
+      tags: [Settings]
+      summary: Get logging settings (ES raw switch + desensitize rules)
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoggingSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Settings]
+      summary: Update logging settings (dangerous; audited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoggingSettingsUpdateRequest' }
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoggingSettings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settings/system:
+    get:
+      tags: [Settings]
+      summary: Get system settings (timeouts/upload/default policy)
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Settings]
+      summary: Update system settings (audited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SystemSettingsUpdateRequest' }
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemSettings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settings/oidc:
+    get:
+      tags: [Settings]
+      summary: Get OIDC login settings/status (no org sync in v1)
+      responses:
+        '200':
+          description: OIDC settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OidcSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  # -------------------------
+  # Me (current admin principal)
+  # -------------------------
+  /me:
+    get:
+      tags: [Users]
+      summary: Get current logged-in user profile and permissions
+      responses:
+        '200':
+          description: Current user + permission codes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeResponse' }
+              examples:
+                example:
+                  value:
+                    user:
+                      id: 101
+                      oidc_subject: "00u1abcd..."
+                      username: "jinbang"
+                      display_name: "刘金榜"
+                      email: "jinbang@example.com"
+                      dept_id: 1
+                      is_active: true
+                      last_login_at: "2026-02-13T00:00:00Z"
+                    dept:
+                      id: 1
+                      name: "研究院"
+                      code: "RND"
+                      parent_id: null
+                      path: "/1"
+                      is_active: true
+                    role_names: ["ADMIN"]
+                    permission_codes:
+                      - "admin:dashboard:read"
+                      - "admin:models:read"
+                      - "admin:models:write"
+                      - "admin:keys:read"
+                      - "admin:keys:write"
+                      - "admin:rbac:manage"
+                      - "admin:security:read"
+                      - "admin:security:write"
+                      - "admin:logs:read"
+                      - "admin:logs:raw:read"
+                      - "admin:settings:write"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # -------------------------
+  # Departments
+  # -------------------------
+  /departments:
+    get:
+      tags: [Users]
+      summary: List departments (for dropdowns and grouping)
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: search by name/code
+        - name: is_active
+          in: query
+          schema: { type: boolean, default: true }
+        - name: parent_id
+          in: query
+          schema: { type: integer, format: int64, nullable: true }
+          description: filter by parent id; omit to list all
+        - name: as_tree
+          in: query
+          schema: { type: boolean, default: false }
+          description: return as tree structure for UI
+        - name: limit
+          in: query
+          schema: { type: integer, default: 500, minimum: 1, maximum: 5000 }
+      responses:
+        '200':
+          description: Departments (flat list or tree)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/Department' }
+                  - $ref: '#/components/schemas/DepartmentTreeResponse'
+              examples:
+                flat_example:
+                  value:
+                    - id: 1
+                      name: "研究院"
+                      code: "RND"
+                      parent_id: null
+                      path: "/1"
+                      is_active: true
+                    - id: 2
+                      name: "产品部"
+                      code: "PROD"
+                      parent_id: null
+                      path: "/2"
+                      is_active: true
+                tree_example:
+                  value:
+                    items:
+                      - id: 1
+                        name: "研究院"
+                        code: "RND"
+                        parent_id: null
+                        path: "/1"
+                        is_active: true
+                        children:
+                          - id: 11
+                            name: "平台组"
+                            code: "RND-PLATFORM"
+                            parent_id: 1
+                            path: "/1/11"
+                            is_active: true
+                            children: []
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /departments/paged:
+    get:
+      tags: [Users]
+      summary: List departments (paged; for admin maintenance pages)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/order'
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+        - name: parent_id
+          in: query
+          schema: { type: integer, format: int64, nullable: true }
+      responses:
+        '200':
+          description: Paged departments
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedDepartment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: SESSION
+
+  parameters:
+    idPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+    page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1, minimum: 1 }
+    pageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 200 }
+    sort:
+      name: sort
+      in: query
+      schema: { type: string, default: "created_at" }
+    order:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+    timeFrom:
+      name: from
+      in: query
+      schema: { type: string, format: date-time }
+    timeTo:
+      name: to
+      in: query
+      schema: { type: string, format: date-time }
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            example:
+              value:
+                code: "BAD_REQUEST"
+                message: "Invalid parameter"
+                details: { field: "model_type" }
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            example:
+              value: { code: "UNAUTHORIZED", message: "Login required" }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            example:
+              value: { code: "FORBIDDEN", message: "Insufficient permission" }
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            example:
+              value: { code: "NOT_FOUND", message: "Resource not found" }
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            example:
+              value: { code: "CONFLICT", message: "Name already exists" }
+
+  schemas:
+    # -------------------------
+    # Common
+    # -------------------------
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+
+    OwnerType:
+      type: string
+      enum: [USER, APP]
+
+    ModelType:
+      type: string
+      enum: [CHAT, EMBEDDING, RERANK, VL, OCR]
+
+    PolicyType:
+      type: string
+      enum: [COST_FIRST, QUALITY_FIRST, LATENCY_FIRST]
+
+    ValidationIssue:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        field: { type: string }
+
+    # -------------------------
+    # Dashboard
+    # -------------------------
+    DashboardSummary:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        requests: { type: integer }
+        success_rate: { type: number }
+        p95_latency_ms: { type: integer }
+        total_tokens: { type: integer }
+        total_cost_cny: { type: number }
+
+    # -------------------------
+    # Models
+    # -------------------------
+    Model:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        vendor: { type: string }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        vendor_model_id: { type: string }
+        enabled: { type: boolean }
+        currency: { type: string, default: "CNY" }
+        input_price: { type: number }
+        output_price: { type: number }
+        max_context: { type: integer, nullable: true }
+        timeout_ms: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ModelCreateRequest:
+      type: object
+      required: [name, vendor, model_type, vendor_model_id]
+      properties:
+        name: { type: string }
+        vendor: { type: string }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        vendor_model_id: { type: string }
+        enabled: { type: boolean, default: true }
+        currency: { type: string, default: "CNY" }
+        input_price: { type: number, default: 0 }
+        output_price: { type: number, default: 0 }
+        max_context: { type: integer, nullable: true }
+        timeout_ms: { type: integer, default: 60000 }
+
+    ModelUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ModelCreateRequest'
+
+    ModelCredentialUpsertRequest:
+      type: object
+      required: [credential_type, payload]
+      properties:
+        credential_type:
+          type: string
+          enum: [API_KEY, AKSK, OAUTH, CUSTOM]
+        payload:
+          type: object
+          additionalProperties: true
+
+    PagedModel:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Model' }
+
+    # -------------------------
+    # Routing
+    # -------------------------
+    RoutingPolicy:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        dept_id: { type: integer, format: int64 }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        policy_type: { $ref: '#/components/schemas/PolicyType' }
+        enabled: { type: boolean }
+        model_chain:
+          type: array
+          items: { type: integer, format: int64 }
+        updated_at: { type: string, format: date-time }
+
+    RoutingPolicyUpsertRequest:
+      type: object
+      required: [dept_id, model_type, policy_type, model_chain]
+      properties:
+        dept_id: { type: integer, format: int64 }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        policy_type: { $ref: '#/components/schemas/PolicyType' }
+        enabled: { type: boolean, default: true }
+        model_chain:
+          type: array
+          minItems: 1
+          items: { type: integer, format: int64 }
+
+    # -------------------------
+    # API Keys
+    # -------------------------
+    ApiKey:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        owner_type: { $ref: '#/components/schemas/OwnerType' }
+        owner_id: { type: integer, format: int64 }
+        dept_id: { type: integer, format: int64 }
+        expires_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        scoped_model_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          nullable: true
+        created_at: { type: string, format: date-time }
+
+    ApiKeyCreateRequest:
+      type: object
+      required: [name, owner_type, owner_id, dept_id]
+      properties:
+        name: { type: string }
+        owner_type: { $ref: '#/components/schemas/OwnerType' }
+        owner_id: { type: integer, format: int64 }
+        dept_id: { type: integer, format: int64 }
+        expires_at: { type: string, format: date-time, nullable: true }
+        scoped_model_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          nullable: true
+
+    ApiKeyCreateResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          required: [api_key_plaintext]
+          properties:
+            api_key_plaintext:
+              type: string
+              description: Returned once; never returned again.
+
+    ApiKeyPatchRequest:
+      type: object
+      properties:
+        expires_at: { type: string, format: date-time, nullable: true }
+        scoped_model_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          nullable: true
+
+    PagedApiKey:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ApiKey' }
+
+    # -------------------------
+    # Users
+    # -------------------------
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        oidc_subject: { type: string }
+        username: { type: string }
+        display_name: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean }
+        last_login_at: { type: string, format: date-time, nullable: true }
+
+    UserPatchRequest:
+      type: object
+      properties:
+        dept_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean, nullable: true }
+
+    PagedUser:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+
+    # -------------------------
+    # Apps
+    # -------------------------
+    App:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        owner_user_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    AppCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        owner_user_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean, default: true }
+
+    AppPatchRequest:
+      type: object
+      properties:
+        owner_user_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean, nullable: true }
+
+    PagedApp:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/App' }
+
+    # -------------------------
+    # Roles & Permissions
+    # -------------------------
+    Role:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        is_default: { type: boolean }
+
+    RoleCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        is_default: { type: boolean, default: false }
+
+    RolePatchRequest:
+      type: object
+      properties:
+        name: { type: string, nullable: true }
+        is_default: { type: boolean, nullable: true }
+
+    Permission:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        description: { type: string, nullable: true }
+
+    # -------------------------
+    # Quotas
+    # -------------------------
+    Quota:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        scope_type: { type: string, enum: [USER, DEPT] }
+        scope_id: { type: integer, format: int64 }
+        month_yyyymm: { type: string }
+        token_cap: { type: integer, format: int64 }
+        token_used: { type: integer, format: int64 }
+        updated_at: { type: string, format: date-time }
+
+    QuotaUpsertRequest:
+      type: object
+      required: [scope_type, scope_id, month_yyyymm, token_cap]
+      properties:
+        scope_type: { type: string, enum: [USER, DEPT] }
+        scope_id: { type: integer, format: int64 }
+        month_yyyymm: { type: string, pattern: '^\d{6}$' }
+        token_cap: { type: integer, format: int64, minimum: 0 }
+
+    PagedQuota:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Quota' }
+
+    # -------------------------
+    # Security Governance
+    # -------------------------
+    SensitiveWord:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        phrase: { type: string }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        action: { type: string, enum: [WARN, BLOCK] }
+        scope_type: { type: string, enum: [GLOBAL, DEPT, USER] }
+        scope_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SensitiveWordUpsertRequest:
+      type: object
+      required: [phrase, model_type, severity, action, scope_type]
+      properties:
+        phrase: { type: string }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        action: { type: string, enum: [WARN, BLOCK] }
+        scope_type: { type: string, enum: [GLOBAL, DEPT, USER] }
+        scope_id: { type: integer, format: int64, nullable: true }
+        is_active: { type: boolean, default: true }
+
+    PagedSensitiveWord:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SensitiveWord' }
+
+    AccessListEntry:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        list_type: { type: string, enum: [ALLOW, BLOCK] }
+        subject_type: { type: string, enum: [USER, DEPT, APP, IP] }
+        subject_id: { type: integer, format: int64, nullable: true }
+        subject_value: { type: string, nullable: true, description: e.g. IP/CIDR }
+        reason: { type: string, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AccessListEntryUpsertRequest:
+      type: object
+      required: [list_type, subject_type]
+      properties:
+        list_type: { type: string, enum: [ALLOW, BLOCK] }
+        subject_type: { type: string, enum: [USER, DEPT, APP, IP] }
+        subject_id: { type: integer, format: int64, nullable: true }
+        subject_value: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        is_active: { type: boolean, default: true }
+
+    PagedAccessListEntry:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AccessListEntry' }
+
+    PromptInjectionPolicy:
+      type: object
+      properties:
+        mode: { type: string, enum: [OFF, DETECT, BLOCK] }
+        score_threshold: { type: number }
+        content_safety_enabled: { type: boolean }
+        sensitive_word_enabled: { type: boolean }
+        allowlist_enabled: { type: boolean }
+        blocklist_enabled: { type: boolean }
+        max_risk_level: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        updated_at: { type: string, format: date-time }
+
+    PromptInjectionPolicyUpdateRequest:
+      type: object
+      properties:
+        mode: { type: string, enum: [OFF, DETECT, BLOCK] }
+        score_threshold: { type: number, minimum: 0, maximum: 1 }
+        content_safety_enabled: { type: boolean }
+        sensitive_word_enabled: { type: boolean }
+        allowlist_enabled: { type: boolean }
+        blocklist_enabled: { type: boolean }
+        max_risk_level: { type: string, enum: [LOW, MEDIUM, HIGH] }
+
+    SecurityIncident:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        timestamp: { type: string, format: date-time }
+        request_id: { type: string, nullable: true }
+        rule_type: { type: string, enum: [SENSITIVE_WORD, PROMPT_INJECTION, ACCESS_LIST] }
+        rule_id: { type: string, nullable: true }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        action: { type: string, enum: [ALLOW, WARN, BLOCK] }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        model_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        user_id: { type: integer, format: int64, nullable: true }
+        detail_json:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    PagedSecurityIncident:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SecurityIncident' }
+
+    # -------------------------
+    # Reports
+    # -------------------------
+    UsageAggRow:
+      type: object
+      properties:
+        key: { type: string }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        user_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        model_id: { type: integer, format: int64, nullable: true }
+        vendor: { type: string, nullable: true }
+        requests: { type: integer }
+        success_rate: { type: number }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        total_tokens: { type: integer }
+        p95_latency_ms: { type: integer, nullable: true }
+
+    CostAggRow:
+      type: object
+      properties:
+        key: { type: string }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        user_id: { type: integer, format: int64, nullable: true }
+        dept_id: { type: integer, format: int64, nullable: true }
+        model_id: { type: integer, format: int64, nullable: true }
+        vendor: { type: string, nullable: true }
+        total_cost_cny: { type: number }
+        total_tokens: { type: integer }
+        requests: { type: integer, nullable: true }
+
+    SecurityAggRow:
+      type: object
+      properties:
+        key: { type: string }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        incident_count: { type: integer }
+        blocked_count: { type: integer }
+        warned_count: { type: integer }
+
+    # -------------------------
+    # Logs
+    # -------------------------
+    LogHit:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        request_id: { type: string }
+        base_path: { type: string, enum: [OPENAI, CLAUDE] }
+        endpoint: { type: string }
+        status: { type: string, enum: [SUCCESS, FAILED] }
+        error_code: { type: string, nullable: true }
+        dept_id: { type: integer, format: int64 }
+        subject_type: { $ref: '#/components/schemas/OwnerType' }
+        subject_id: { type: integer, format: int64 }
+        vendor: { type: string }
+        model_id: { type: integer, format: int64 }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        total_tokens: { type: integer }
+        cost_cny: { type: number }
+        latency_ms: { type: integer }
+        job_id: { type: string, nullable: true }
+
+    PagedLogHit:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/LogHit' }
+
+    LogDetail:
+      allOf:
+        - $ref: '#/components/schemas/LogHit'
+        - type: object
+          properties:
+            routing_policy: { type: string, nullable: true }
+            fallback_used: { type: boolean, nullable: true }
+            raw_prompt:
+              description: Present only if ES raw enabled AND user has permission
+              nullable: true
+              oneOf:
+                - type: string
+                - type: object
+                  additionalProperties: true
+            raw_response:
+              description: Present only if ES raw enabled AND user has permission
+              nullable: true
+              oneOf:
+                - type: string
+                - type: object
+                  additionalProperties: true
+
+    # -------------------------
+    # Jobs
+    # -------------------------
+    Job:
+      type: object
+      properties:
+        job_id: { type: string }
+        job_type: { type: string, enum: [CHAT, EMBEDDING, RERANK, VL, OCR, EMBEDDING_BATCH] }
+        status: { type: string, enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELED] }
+        attempt: { type: integer }
+        max_attempts: { type: integer }
+        owner_type: { $ref: '#/components/schemas/OwnerType' }
+        owner_id: { type: integer, format: int64 }
+        dept_id: { type: integer, format: int64 }
+        requested_model_id: { type: integer, format: int64, nullable: true }
+        model_type: { $ref: '#/components/schemas/ModelType' }
+        file_ids:
+          type: array
+          items: { type: integer, format: int64 }
+          nullable: true
+        input_json:
+          type: object
+          additionalProperties: true
+          nullable: true
+        result_json:
+          type: object
+          additionalProperties: true
+          nullable: true
+        error_code: { type: string, nullable: true }
+        error_message: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PagedJob:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Job' }
+
+    # -------------------------
+    # Audit
+    # -------------------------
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        actor_user_id: { type: integer, format: int64 }
+        action: { type: string }
+        resource_type: { type: string }
+        resource_id: { type: string, nullable: true }
+        detail_json:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_at: { type: string, format: date-time }
+
+    PagedAuditLog:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AuditLog' }
+
+    # -------------------------
+    # Settings
+    # -------------------------
+    LoggingSettings:
+      type: object
+      properties:
+        es_enabled: { type: boolean }
+        es_endpoint: { type: string }
+        index_prefix: { type: string }
+        raw_enabled: { type: boolean }
+        desensitize_enabled: { type: boolean }
+        extra_regex:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              pattern: { type: string }
+              replacement: { type: string }
+
+    LoggingSettingsUpdateRequest:
+      type: object
+      properties:
+        raw_enabled: { type: boolean, nullable: true }
+        desensitize_enabled: { type: boolean, nullable: true }
+        extra_regex:
+          type: array
+          items:
+            type: object
+            required: [name, pattern, replacement]
+            properties:
+              name: { type: string }
+              pattern: { type: string }
+              replacement: { type: string }
+
+    SystemSettings:
+      type: object
+      properties:
+        default_policy_type: { $ref: '#/components/schemas/PolicyType' }
+        upload_max_file_size_bytes: { type: integer, format: int64 }
+        upload_allowed_content_types:
+          type: array
+          items: { type: string }
+        vendor_connect_timeout_ms: { type: integer }
+        vendor_read_timeout_ms: { type: integer }
+
+    SystemSettingsUpdateRequest:
+      type: object
+      properties:
+        default_policy_type: { $ref: '#/components/schemas/PolicyType' }
+        upload_max_file_size_bytes: { type: integer, format: int64 }
+        upload_allowed_content_types:
+          type: array
+          items: { type: string }
+        vendor_connect_timeout_ms: { type: integer }
+        vendor_read_timeout_ms: { type: integer }
+
+    OidcSettings:
+      type: object
+      properties:
+        issuer: { type: string }
+        client_id: { type: string }
+        login_enabled: { type: boolean }
+        groups_claim_present: { type: boolean }
+        org_sync_enabled:
+          type: boolean
+          description: Always false in v1.
+        last_login_at: { type: string, format: date-time, nullable: true }
+
+    Department:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        code: { type: string, nullable: true }
+        parent_id: { type: integer, format: int64, nullable: true }
+        path:
+          type: string
+          nullable: true
+          description: "materialized path for quick tree building, e.g., /1/11"
+        is_active: { type: boolean, default: true }
+
+    DepartmentTreeNode:
+      allOf:
+        - $ref: '#/components/schemas/Department'
+        - type: object
+          properties:
+            children:
+              type: array
+              items: { $ref: '#/components/schemas/DepartmentTreeNode' }
+
+    DepartmentTreeResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DepartmentTreeNode' }
+
+    PagedDepartment:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Department' }
+
+    MeResponse:
+      type: object
+      required: [user, permission_codes]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        dept:
+          $ref: '#/components/schemas/Department'
+          nullable: true
+        role_names:
+          type: array
+          items: { type: string }
+          description: human readable role names for UI display
+        permission_codes:
+          type: array
+          items: { type: string }
+          description: permission codes for menu/button rendering
