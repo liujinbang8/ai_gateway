@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+llmgw:
+  security:
+    server-salt: local-dev-salt
+    sensitive-words:
+      - password
+      - secret
+      - sk-
+    api-keys:
+      - plain-key: openai-demo-key
+        owner-type: USER
+        owner-id: user-1
+        dept-id: dept-a
+        monthly-token-cap: 100000
+      - plain-key: claude-demo-key
+        owner-type: APP
+        owner-id: app-1
+        dept-id: dept-platform
+        monthly-token-cap: 200000
